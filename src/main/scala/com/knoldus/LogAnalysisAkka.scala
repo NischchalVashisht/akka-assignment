@@ -2,64 +2,56 @@ package com.knoldus
 
 import java.io.File
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.util.Timeout
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
-import akka.pattern.ask
-
 
 import scala.concurrent.duration._
 import scala.io.Source
 
-class LogAnalysisAkka extends FileBasicOperation with Actor{
-  def readAndOperate(filename: File): Map[String,Option[Int]] = {
+class LogAnalysisAkka extends FileBasicOperation with Actor with ActorLogging {
+  def readAndOperate(filename: File): Map[String, Option[Int]] = {
     val copyFileName = filename.toString
-
-    val resultMap=Source.fromFile(s"$copyFileName").getLines().flatMap(_.split(" ")).toList.groupBy((word:String)=>word).mapValues(_.length)
-    Map("error"->resultMap.get("[ERROR]"))++Map("warn"->resultMap.get("[WARN]"))
+    val source = Source.fromFile(s"$copyFileName")
+    val resultMap = source.getLines().flatMap(_.split(" ")).toList.groupBy((word: String) => word).mapValues(_.length)
+    source.close()
+    Map("error" -> resultMap.get("[ERROR]")) ++ Map("warn" -> resultMap.get("[WARN]")) ++ Map("info" -> resultMap.get("[INFO]"))
   }
 
-  override def traverseFile(listOfFile: List[File],resultMap:Map[String,Int]): Map[String,Int] = {
+  override def traverseFile(listOfFile: List[File], resultMap: Map[String, Int]): Map[String, Int] = {
     listOfFile match {
       case Nil => resultMap
 
-      case head :: Nil if (head.isFile) => {
-        val x: Map[String,Option[Int]] = readAndOperate(head)
-        val temp1=resultMap("error")
-        val temp2=resultMap("warn")
-        resultMap ++ Map("error"->(x("error").getOrElse(0)+temp1) ) ++ Map("warn"->(x("warn").getOrElse(0)+temp2))
-      }
-
-      case head :: tail if (head.isFile) => {
+      case head :: Nil if head.isFile =>
+        val x: Map[String, Option[Int]] = readAndOperate(head)
+        val temp1 = resultMap("error")
+        val temp2 = resultMap("warn")
+        val temp3 = resultMap("info")
+        resultMap ++ Map("error" -> (x("error").getOrElse(0) + temp1)) ++ Map("warn" -> (x("warn").getOrElse(0) + temp2)) ++ Map("info" -> (x("info").getOrElse(0) + temp3))
+      case head :: tail if head.isFile =>
         val x = readAndOperate(head)
-        val temp1=resultMap("error")
-        val temp2=resultMap("warn")
-        traverseFile(tail, resultMap ++ Map("error"->(x("error").getOrElse(0)+temp1) ) ++ Map("warn"->(x("warn").getOrElse(0)+temp2)))
-      }
+        val temp1 = resultMap("error")
+        val temp2 = resultMap("warn")
+        val temp3 = resultMap("info")
+        traverseFile(tail, resultMap ++ Map("error" -> (x("error").getOrElse(0) + temp1)) ++ Map("warn" -> (x("warn").getOrElse(0) + temp2)) ++ Map("info" -> (x("info").getOrElse(0) + temp3)))
     }
   }
 
-  override def receive: Receive ={
-    case msg:String=>val list=getListOfFile(msg)
-       val re=Future{traverseFile(list,Map("error"->0,"warn"->0))}
-      implicit val timeout = Timeout(14.seconds);
-        val result =Await.result(re, timeout.duration);
-        sender() ! "error is ->"+result("error") + " warn is ->"+result("warn")
-   }
+  override def receive: Receive = {
+    case msg: String => val list = getListOfFile(msg)
+      val result = traverseFile(list, Map("error" -> 0, "warn" -> 0, "info" -> 0))
+      log.info("error is ->" + result("error") / 10 + " warn is ->" + result("warn") + "info is " + result("info"))
+     case _ => log.info("default case")
+  }
 }
 
-object LogAnalysisAkka extends App{
+object LogAnalysisAkkaOb extends App  {
 
-  val actorSystem=ActorSystem("ActorSystem")
-  val actor = actorSystem.actorOf(Props[LogAnalysisAkka], "RootActor");
-  implicit val timeout = Timeout(14.seconds);
+  val actorSystem = ActorSystem("ActorSystem")
+  val actor = actorSystem.actorOf(Props[LogAnalysisAkka], "RootActor")
+  implicit val timeout: Timeout = Timeout(14.seconds)
 
-  val future = actor ? "/home/knoldus/Downloads/Io2/";
-  val result = Await.result(future, timeout.duration);
-  println(result)
-
+  val future = actor ! "/home/knoldus/Downloads/Io2/"
+  actorSystem.terminate()
 }
 
 

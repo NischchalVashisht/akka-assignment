@@ -9,3 +9,5 @@ libraryDependencies +=  "org.scalatest" %% "scalatest" % "3.1.0" % "test"
 
 libraryDependencies += "com.typesafe.akka" %% "akka-actor-typed" % "2.6.3"
 
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime
+
