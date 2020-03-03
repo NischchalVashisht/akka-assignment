@@ -4,6 +4,7 @@ import java.io.File
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.duration._
 import scala.io.Source
@@ -45,6 +46,10 @@ class LogAnalysisAkka extends FileBasicOperation with Actor with ActorLogging {
 }
 
 object LogAnalysisAkkaOb extends App  {
+  val config = ConfigFactory.load()
+  val system = ActorSystem("LogFilesActorSystem", config.getConfig("configuration"))
+  val confStr="default-dispatcher"
+  val threads=6
 
   val actorSystem = ActorSystem("ActorSystem")
   val actor = actorSystem.actorOf(Props[LogAnalysisAkka], "RootActor")

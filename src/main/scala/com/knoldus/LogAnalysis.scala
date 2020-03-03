@@ -34,6 +34,12 @@ class LogAnalysis extends FileBasicOperation{
     }
   }
 
+  def getResult(listOfFile: List[File]):(Double,Double,Double)={
+
+   val result = traverseFile(listOfFile,Map("error"->0,"warn"->0,"info"->0))
+    (result.get("error")/10,result.get("warn")/10,result.get("info")/10 )
+
+  }
 
 }
 
